@@ -147,6 +147,8 @@ const statusInfo={
   Alpa:{emoji:"❌",color:"#ef4444"}
 };
 
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxDtjiWwUfxh8sdZb-kU-b59ElXsceWMo-nXnzLF6fzQJj7jXYMNThss8hVrAb-2uWjDQ/exec";
+
 function wita(){
   return new Date(new Date().toLocaleString("en-US",{timeZone:"Asia/Makassar"}));
 }
@@ -201,6 +203,21 @@ function submitAttendance(){
 
   data.push({name,status:selected.value,time});
   saveData(data);
+
+  // Kirim data absensi ke Google Sheets melalui Apps Script
+  fetch(GOOGLE_SCRIPT_URL, {
+    method: "POST",
+    mode: "no-cors",
+    headers: {
+      "Content-Type": "application/x-www-form-urlencoded"
+    },
+    body: new URLSearchParams({
+      nama: name,
+      status: selected.value
+    })
+  }).catch(function(error) {
+    console.error("GOOGLE SHEETS GAGAL:", error);
+  });
 
   // Kirim data absensi ke email melalui EmailJS
   emailjs.send(
