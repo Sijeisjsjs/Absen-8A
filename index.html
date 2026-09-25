@@ -50,6 +50,7 @@ input[type=text]:focus{border-color:#6366f1}
 #sakit:checked+label{background:#f59e0b}
 #izin:checked+label{background:#3b82f6}
 #alpa:checked+label{background:#ef4444}
+.reset{background:#ef4444;color:white;margin-top:12px}
 button{
   border:0;border-radius:14px;padding:15px;width:100%;font-size:16px;
   font-weight:bold;cursor:pointer;transition:.2s
@@ -74,7 +75,6 @@ button{
 .name{font-weight:bold}.sent{font-size:13px;color:#64748b;margin-top:3px}
 .badge{font-weight:bold;padding:8px 10px;border-radius:10px;font-size:13px}
 .empty{text-align:center;color:#64748b;padding:30px}
-.reset{background:#ef4444;color:white;margin-top:12px}
 @media(max-width:650px){
   .hero h1{font-size:28px}.time{font-size:35px}.card{padding:18px}
   .options{grid-template-columns:repeat(2,1fr)}
@@ -135,7 +135,7 @@ button{
     </div>
 
     <div id="list"></div>
-    <button class="reset" onclick="resetToday()">🗑️ Reset Absensi Hari Ini</button>
+    <button class="reset" onclick="requestReset()">🔐 Reset Absensi</button>
   </div>
 </div>
 
@@ -191,14 +191,20 @@ function formatDate(d){
   return d.toLocaleDateString("id-ID",{weekday:"long",day:"numeric",month:"long",year:"numeric"});
 }
 
-function updateClock(){
+async function updateClock(){
   const d=wita();
   const h=String(d.getHours()).padStart(2,"0");
   const m=String(d.getMinutes()).padStart(2,"0");
   const s=String(d.getSeconds()).padStart(2,"0");
+  const today=dateKey();
+
   document.getElementById("date").textContent=formatDate(d);
   document.getElementById("time").textContent=`${h}:${m}:${s}`;
-  if(dateKey()!==lastDate){lastDate=dateKey();render();}
+
+  if(today!==lastDate){
+    lastDate=today;
+    render();
+  }
 }
 
 function getData(){
@@ -321,11 +327,39 @@ function render(){
   });
 }
 
-async function resetToday(){
-  if(confirm("⚠️ Hapus semua absensi hari ini?")){
+
+
+
+// PIN admin saat ini: 739164  (ubah PIN dengan membuat hash SHA-256 baru jika diperlukan)
+const RESET_PIN_HASH = "0864f7d7e73de9fea449e594a1ebf95ac3da44a16ce5aa4ac98acb97e5f985d6";
+
+async function requestReset(){
+  const pin = prompt("🔐 RESET ABSENSI\n\nMasukkan PIN admin:");
+  if(pin === null) return;
+
+  const hash = Array.from(new Uint8Array(
+    await crypto.subtle.digest("SHA-256", new TextEncoder().encode(pin))
+  )).map(b=>b.toString(16).padStart(2,"0")).join("");
+
+  if(hash !== RESET_PIN_HASH){
+    alert("❌ PIN salah. Absensi tidak di-reset.");
+    return;
+  }
+
+  if(!confirm("⚠️ Yakin ingin menghapus SEMUA absensi hari ini?")) return;
+
+  try{
     cache={date:dateKey(),absensi:[]};
-    try{ await saveRemote(); }catch(e){ alert("⚠️ Gagal reset di database. Coba lagi."); }
+    await saveRemote();
+
+    // Pastikan database sudah berisi data kosong.
+    await fetchRemote();
+    cache={date:dateKey(),absensi:[]};
     render();
+
+    alert("✅ Semua absensi hari ini berhasil dihapus dari JSONBin.");
+  }catch(e){
+    alert("❌ Reset gagal. Data database tidak diubah.");
   }
 }
 
@@ -341,7 +375,7 @@ async function initialLoad(){
   render();
 }
 initialLoad();
-setInterval(updateClock,1000);
+setInterval(()=>{ updateClock(); },1000);
 setInterval(async ()=>{ try{ await fetchRemote(); render(); }catch(e){} },15000);
 </script>
 </body>
